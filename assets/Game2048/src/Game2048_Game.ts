@@ -25,6 +25,15 @@ export default class Game2048_Game extends cc.Component {
     @property(cc.Node)
     blockBgLayer: cc.Node = null;
 
+    @property(cc.Node)
+    merge: cc.Node = null;
+    
+    @property(cc.Node)
+    bgMergeLayer: cc.Node = null;
+    
+    @property(cc.Node)
+    mergeLayer: cc.Node = null;
+
     @property(cc.Prefab)
     blockPrefab: cc.Prefab = null;
 
@@ -32,14 +41,14 @@ export default class Game2048_Game extends cc.Component {
     gameLogic: Game2048_GameLogic = null;
     haveTemp: boolean = false;  //是否存在历史对局
     isMove: boolean = false;  //是否是移动状态
-    inputHandler: Game2048_InputHandler = null;
+    // inputHandler: Game2048_InputHandler = null;
 
     onLoad() {
         Game2048_Instance.Game = this;
     }
 
     onDestroy() {
-        this.inputHandler.destroy();
+        // this.inputHandler.destroy();
         Game2048_Instance.Game = null;
     }
 
@@ -48,17 +57,15 @@ export default class Game2048_Game extends cc.Component {
         this.blockPool = new MyPool(this.blockPrefab);
         this.blockPool.create(9);
 
-        this.inputHandler = new Game2048_InputHandler({
-            target: this.board,
-            onKeyUp: (dir: string) => {
-                console.log('** dir', dir);
-                if (!this.isMove) {
-                    let obj = this.gameLogic.move(dir);
-                    console.log('** obj', obj);
-                    this.onMapChange(obj);
-                }
-            }
-        })
+        // this.inputHandler = new Game2048_InputHandler({
+        //     target: this.board,
+        //     onKeyUp: (dir: string) => {
+        //         if (!this.isMove) {
+        //             let obj = this.gameLogic.move(dir);
+        //             this.onMapChange(obj);
+        //         }
+        //     }
+        // })
         this.gameLogic = new Game2048_GameLogic();
         this.gameLogic.init(Game2048_Game.GameDifficult);
 
@@ -67,11 +74,15 @@ export default class Game2048_Game extends cc.Component {
 
         this.createBlockByMap();
         this.checkMap();
-        this.inputHandler.inputToggle = true;
+        // this.inputHandler.inputToggle = true;
     }
 
     createBlockByMap() {
         let children = this.blockLayer.children.slice();
+        console.log('** children', children);
+        let mergeChildren = this.mergeLayer.children.slice();
+        console.log('** mergeChildren', mergeChildren);
+
         for (let i = 0; i < children.length; ++i) {
             this.blockPool.put(children[i]);
         }
@@ -84,6 +95,14 @@ export default class Game2048_Game extends cc.Component {
                     this.createBlock(block.number, col, row, this.blockLayer);
                 }
                 this.createBlock(0, col, row, this.blockBgLayer);
+            }
+        }
+
+        //合并框
+        for (let row = 0; row < 2; row++) {
+            for (let col = 0; col < 4; col++) {
+                let block = gl.gameMap[row][col];
+                this.createBlock(0, col, row, this.bgMergeLayer);
             }
         }
     }
@@ -138,7 +157,7 @@ export default class Game2048_Game extends cc.Component {
 
     //锤子
     prop2() {
-        this.inputHandler.inputToggle = false;
+        // this.inputHandler.inputToggle = false;
         this.gameUI.showChooseBoard('请选择你要移除的方块', (touch: cc.Event.EventTouch) => {
             let location = touch.getLocation();
             let nodePos = this.blockLayer.convertToNodeSpaceAR(location);
@@ -153,7 +172,7 @@ export default class Game2048_Game extends cc.Component {
                     this.blockPool.put(block.target.node);
 
                     this.gameUI.hideChooseBoard();
-                    this.inputHandler.inputToggle = true;
+                    // this.inputHandler.inputToggle = true;
                     this.checkMap();
                 });
                 this.gameUI.refreshAllPropButton();
@@ -176,7 +195,7 @@ export default class Game2048_Game extends cc.Component {
     }
     //魔棒
     prop4() {
-        this.inputHandler.inputToggle = false;
+        // this.inputHandler.inputToggle = false;
         this.gameUI.showChooseBoard('请选择你要升级的方块', (touch: cc.Event.EventTouch) => {
             let location = touch.getLocation();
             let nodePos = this.blockLayer.convertToNodeSpaceAR(location);
@@ -187,7 +206,7 @@ export default class Game2048_Game extends cc.Component {
                 Game2048_GameData.prop4Num--;
                 this.levelUp(block);
                 this.gameUI.hideChooseBoard();
-                this.inputHandler.inputToggle = true;
+                // this.inputHandler.inputToggle = true;
                 this.checkMap();
                 this.gameUI.refreshAllPropButton();
             }
