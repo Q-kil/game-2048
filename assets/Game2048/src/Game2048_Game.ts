@@ -41,14 +41,14 @@ export default class Game2048_Game extends cc.Component {
     gameLogic: Game2048_GameLogic = null;
     haveTemp: boolean = false;  //是否存在历史对局
     isMove: boolean = false;  //是否是移动状态
-    // inputHandler: Game2048_InputHandler = null;
+    inputHandler: Game2048_InputHandler = null;
 
     onLoad() {
         Game2048_Instance.Game = this;
     }
 
     onDestroy() {
-        // this.inputHandler.destroy();
+        this.inputHandler.destroy();
         Game2048_Instance.Game = null;
     }
 
@@ -57,15 +57,16 @@ export default class Game2048_Game extends cc.Component {
         this.blockPool = new MyPool(this.blockPrefab);
         this.blockPool.create(9);
 
-        // this.inputHandler = new Game2048_InputHandler({
-        //     target: this.board,
-        //     onKeyUp: (dir: string) => {
-        //         if (!this.isMove) {
-        //             let obj = this.gameLogic.move(dir);
-        //             this.onMapChange(obj);
-        //         }
-        //     }
-        // })
+        this.inputHandler = new Game2048_InputHandler({
+            target: this.board,
+            onKeyUp: (dir: string) => {
+                if (!this.isMove) {
+                    let obj = this.gameLogic.move(dir);
+                    this.onMapChange(obj);
+                }
+            }
+        })
+
         this.gameLogic = new Game2048_GameLogic();
         this.gameLogic.init(Game2048_Game.GameDifficult);
 
@@ -74,7 +75,9 @@ export default class Game2048_Game extends cc.Component {
 
         this.createBlockByMap();
         this.checkMap();
-        // this.inputHandler.inputToggle = true;
+        this.inputHandler.inputToggle = true;
+
+        this.board.on("touchstart", this._onTouchStart, this);
     }
 
     createBlockByMap() {
@@ -124,6 +127,23 @@ export default class Game2048_Game extends cc.Component {
         return com;
     }
 
+    createMergeBlock(score: number, col: number, row: number, parent: cc.Node, show: boolean = true): Game2048_Block {
+        let b: cc.Node = this.blockPool.get();
+        parent.addChild(b);
+        let pos = this.gameLogic.getBlockPosByRC(col, row);
+        b.position = pos;
+        let com = b.getComponent(Game2048_Block);
+        com.setScore(score);
+        com.resize(this.gameLogic.blockSize);
+        if (score > 0) {
+            this.gameLogic.mergeMap[row][col].target = com;
+            if (show) {
+                com.onShow();
+            }
+        }
+        return com;
+    }
+
     checkMap() {
         if (!this.haveTemp) {
             this.gameLogic.logMap();
@@ -137,6 +157,42 @@ export default class Game2048_Game extends cc.Component {
         this.gameUI.refrshBestLabel(best);
         this.gameUI.refreshAllPropButton();
         this.checkEnd();
+    }
+
+    _onTouchStart(e){
+        console.log('e', e);
+        let location = e.getLocation();
+        let nodePos = this.blockLayer.convertToNodeSpaceAR(location);
+        let { row, col } = this.gameLogic.getRCByPos(nodePos);
+        console.log(row, col);
+        if (!this.gameLogic.checkSide(row, col)) return;
+        let block = this.gameLogic.gameMap[row][col];
+        if (block) {
+            Game2048_GameData.prop2Num--;
+            this.gameLogic.removeBlock(block);
+            block.target && block.target.beDestroy(() => {
+                this.blockPool.put(block.target.node);
+
+                this.gameUI.hideChooseBoard();
+                this.inputHandler.inputToggle = true;
+                this.checkMap();
+            });
+            this.gameUI.refreshAllPropButton();
+
+            //随机生成块
+            // let newBlock = this.gameLogic.addRandomBlock();
+            // let com = this.createBlock(newBlock.number, newBlock.col, newBlock.row, this.blockLayer, false);
+            // com.node.scale = 0;
+            // newBlock.target.onShow();
+
+            //添加到合并框
+            let mergeBlock = this.gameLogic.addMergeBox();
+            console.log('** mergeBlock', mergeBlock);
+            let createMergeBlock = this.createMergeBlock(mergeBlock.number, mergeBlock.col, mergeBlock.row, this.mergeLayer, false);
+            createMergeBlock.node.scale = 0;
+            console.log('** createMergeBlock', mergeBlock);
+            mergeBlock.target.onShow();
+        }
     }
 
     //检测完成最大目标
@@ -157,7 +213,7 @@ export default class Game2048_Game extends cc.Component {
 
     //锤子
     prop2() {
-        // this.inputHandler.inputToggle = false;
+        this.inputHandler.inputToggle = false;
         this.gameUI.showChooseBoard('请选择你要移除的方块', (touch: cc.Event.EventTouch) => {
             let location = touch.getLocation();
             let nodePos = this.blockLayer.convertToNodeSpaceAR(location);
@@ -172,7 +228,7 @@ export default class Game2048_Game extends cc.Component {
                     this.blockPool.put(block.target.node);
 
                     this.gameUI.hideChooseBoard();
-                    // this.inputHandler.inputToggle = true;
+                    this.inputHandler.inputToggle = true;
                     this.checkMap();
                 });
                 this.gameUI.refreshAllPropButton();
@@ -195,7 +251,7 @@ export default class Game2048_Game extends cc.Component {
     }
     //魔棒
     prop4() {
-        // this.inputHandler.inputToggle = false;
+        this.inputHandler.inputToggle = false;
         this.gameUI.showChooseBoard('请选择你要升级的方块', (touch: cc.Event.EventTouch) => {
             let location = touch.getLocation();
             let nodePos = this.blockLayer.convertToNodeSpaceAR(location);
@@ -206,7 +262,7 @@ export default class Game2048_Game extends cc.Component {
                 Game2048_GameData.prop4Num--;
                 this.levelUp(block);
                 this.gameUI.hideChooseBoard();
-                // this.inputHandler.inputToggle = true;
+                this.inputHandler.inputToggle = true;
                 this.checkMap();
                 this.gameUI.refreshAllPropButton();
             }
@@ -240,6 +296,7 @@ export default class Game2048_Game extends cc.Component {
     }
 
     onMapChange(obj) {
+        console.log('** obj', obj);
         if (obj.isOver) {
             this.showFail();
             return;

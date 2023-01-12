@@ -36,7 +36,8 @@ interface RC {
 
 export default class Game2048_GameLogic {
     gameMap: LogicBlock[][] = [];
-    originNum: number = 2;
+    mergeMap: LogicBlock[][] = [];
+    originNum: number = 10;
     mapSize: number;
     blockSize: number;
     colNum: number;
@@ -84,6 +85,17 @@ export default class Game2048_GameLogic {
         }
     }
 
+    initMergeMap(){
+        console.log('** initMergeMap');
+        this.mergeMap = [];
+        for (let row = 1; row >= 0; row--) {
+            this.mergeMap[row] = [];
+            for (let col = 0; col < 4; col++) {
+                this.mergeMap[row][col] = null;
+            }
+        }
+    }
+
     /**
      * 根据存储创建地图
      * @param difficult 
@@ -93,6 +105,7 @@ export default class Game2048_GameLogic {
         let temp = Game2048_GameData.getTempConfig(difficult);
         if (temp && temp.cur && temp.cur.length > 0) {
             if (this.gameMap.length === 0) {
+                console.log('** gameMap init');
                 this.initMap();
             }
 
@@ -114,6 +127,7 @@ export default class Game2048_GameLogic {
             this.score = 0;
             haveTemp = false;
         }
+        this.initMergeMap();
         return haveTemp;
     }
 
@@ -165,6 +179,7 @@ export default class Game2048_GameLogic {
      */
     addRandomBlock() {
         let pos = this.getEmptyPos();
+        console.log('pos', pos);
         if (pos.length > 0) {
             let value = Math.random() < Game2048_GameDefine.BURN_2_CHANCE ? 1 : 2;
             let randomPos = pos[Math.floor(Math.random() * pos.length)];
@@ -187,6 +202,29 @@ export default class Game2048_GameLogic {
         });
         return list;
     }
+
+    /**
+     * 添加到合并框
+     */
+    addMergeBox(){
+        let list = [];
+        this._eachMergeBlock((col: number, row: number, block) => {
+            if (block == null) {
+                list.push({ col: col, row: row });
+            }
+        });
+        console.log('** list', list);
+        if (list.length > 0) {
+            let value = Math.random() < Game2048_GameDefine.BURN_2_CHANCE ? 1 : 2;
+            // let firstPos = list[Math.floor(Math.random() * list.length)];
+            let firstPos = list[0];
+            let block = new LogicBlock(value, firstPos.col, firstPos.row);
+            this.mergeMap[firstPos.row][firstPos.col] = block;
+            return block;
+        }
+        return null;
+    }
+
 
     /**
      * 移除块
@@ -477,6 +515,13 @@ export default class Game2048_GameLogic {
         for (let row = 0; row < this.colNum; row++) {
             for (let col = 0; col < this.colNum; col++) {
                 callback(col, row, this.gameMap[row][col]);
+            }
+        }
+    }
+    private _eachMergeBlock(callback: (col: number, row: number, block: LogicBlock) => void) {
+        for (let row = 1; row >= 0; row--) {
+            for (let col = 0; col < 4; col++) {
+                callback(col, row, this.mergeMap[row][col]);
             }
         }
     }
