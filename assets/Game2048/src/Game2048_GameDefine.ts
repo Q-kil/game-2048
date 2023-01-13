@@ -22,7 +22,7 @@ export namespace Game2048_GameDefine {
         cc.color(30, 110, 140),//16384*2
     ];
 
-    export const BURN_2_CHANCE: number = .9;        //产生2的几率
+    export const BURN_2_CHANCE: number = 1;        //产生2的几率
 
     export enum DIFFICULT {
         ['3x3'],

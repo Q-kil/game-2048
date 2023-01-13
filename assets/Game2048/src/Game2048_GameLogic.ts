@@ -68,7 +68,7 @@ export default class Game2048_GameLogic {
         this.blockSize = blockSize;
         this.mapSize = mapSize;
         this.colNum = count;
-
+        console.log('--init', blockSize, mapSize, count);
         Game2048_GameData.initDifficult(difficult);
     }
 
@@ -102,7 +102,8 @@ export default class Game2048_GameLogic {
      */
     initWithTemp(difficult: Game2048_GameDefine.DIFFICULT): boolean {
         let haveTemp: boolean = false;
-        let temp = Game2048_GameData.getTempConfig(difficult);
+        // let temp = Game2048_GameData.getTempConfig(difficult);
+        let temp = null;
         if (temp && temp.cur && temp.cur.length > 0) {
             if (this.gameMap.length === 0) {
                 console.log('** gameMap init');
@@ -304,10 +305,10 @@ export default class Game2048_GameLogic {
                         })
                         let merged = new LogicBlock(block.number + 1, next.col, next.row);
                         merged.isMerged = true;
-                        this.gameMap[next.row][next.col] = merged;
+                        this.mergeMap[next.row][next.col] = merged;
                         mergeList.push(merged);
                         //移除
-                        this.gameMap[block.row][block.col] = null;
+                        this.mergeMap[block.row][block.col] = null;
 
                         //加分
                         this.score += Math.pow(2, merged.number);
@@ -316,8 +317,8 @@ export default class Game2048_GameLogic {
                     }
                     //移动
                     else {
-                        this.gameMap[block.row][block.col] = null;
-                        this.gameMap[fp.farthest.row][fp.farthest.col] = block;
+                        this.mergeMap[block.row][block.col] = null;
+                        this.mergeMap[fp.farthest.row][fp.farthest.col] = block;
                         block.col = fp.farthest.col;
                         block.row = fp.farthest.row;
                         if (!this._rcEqual(block, pos)) {
@@ -339,6 +340,100 @@ export default class Game2048_GameLogic {
         if (moved) {
             let block = this.addRandomBlock();
             addList.push(block);
+        }
+        return {
+            isOver: this.isOver,
+            moved: moved,
+            addList: addList,
+            mergeList: mergeList,
+            moveList: moveList,
+            hasMerge: hasMerge
+        };
+    }
+
+    moveMergeBox(dirStr: string) {
+        if (!this._checkCanMove()) {
+            this.isOver = true;
+            return {
+                isOver: this.isOver
+            }
+        }
+        this.isOver = false;
+
+        let dir = MoveDir[dirStr];
+        let traversals = this._buideTraversalsMerge(dir);
+        let moved = false;
+        let moveList = [], addList = [], mergeList = [];
+        let pos: RC, block: LogicBlock;
+        let hasMerge = false;
+        console.log('-- traversals', traversals);
+        for (let row = 1; row >= 0; row--) {
+            for (let col = 0; col < 4; col++) {
+                pos = { col: col, row: row };
+                block = this._rcBlockMerge(pos);
+                console.log('-- block', block);
+                if (block) {
+                    let fp = this._findFarhestPostionMerge(pos, dir);
+                    console.log('fp', fp);
+                    let next = this._rcBlockMerge(fp.next);
+                    console.log('next', next);
+
+                    //合并
+                    if (next && next.number === block.number && !next.isMerged) {
+                        console.log('++ 合并');
+                        hasMerge = true;
+                        //新建
+                        moveList.push({
+                            block: next,
+                            to: { col: next.col, row: next.row },
+                            needRemove: true
+                        })
+                        moveList.push({
+                            block: block,
+                            to: { col: next.col, row: next.row },
+                            needRemove: true
+                        })
+                        let merged = new LogicBlock(block.number + 1, next.col, next.row);
+                        merged.isMerged = true;
+                        this.mergeMap[next.row][next.col] = merged;
+                        console.log('++ merged', merged);
+                        mergeList.push(merged);
+                        //移除
+                        this.mergeMap[block.row][block.col] = null;
+
+                        //加分
+                        this.score += Math.pow(2, merged.number);
+                        console.log('++ score', this.score);
+
+                        moved = true;
+                    }
+                    //移动
+                    else {
+                        console.log('++ 移动');
+                        this.mergeMap[block.row][block.col] = null;
+                        this.mergeMap[fp.farthest.row][fp.farthest.col] = block;
+                        block.col = fp.farthest.col;
+                        block.row = fp.farthest.row;
+                        if (!this._rcEqual(block, pos)) {
+                            moved = true;
+                            moveList.push({
+                                block: block,
+                                to: { col: block.col, row: block.row },
+                                needRemove: false,
+                            })
+                        }
+                    }
+                }
+            }
+        }
+
+        for (let merge of mergeList) {
+            merge.isMerged = false;
+        }
+
+        if (moved) {
+            // let block = this.addMergeBox();
+            // addList.push(block);
         }
         return {
             isOver: this.isOver,
@@ -434,6 +529,18 @@ export default class Game2048_GameLogic {
             next: rc,
         }
     }
+    private _findFarhestPostionMerge(rc: RC, dir: cc.Vec2): { farthest: RC, next: RC } {
+        let previous;
+        do {
+            previous = rc;
+            rc = { col: previous.col + dir.x, row: previous.row + dir.y };
+        } while (this._withinBoundsMerge(rc) && this._rcEmptyMerge(rc));
+
+        return {
+            farthest: previous,
+            next: rc,
+        }
+    }
 
     /**
      * 返回两个坐标是否相同
@@ -453,6 +560,9 @@ export default class Game2048_GameLogic {
     private _rcEmpty(rc: RC): boolean {
         return !this._rcNotEmpty(rc);
     }
+    private _rcEmptyMerge(rc: RC): boolean {
+        return !this._rcNotEmptyMerge(rc);
+    }
 
     /**
      * 返回行列是否非空
@@ -462,6 +572,9 @@ export default class Game2048_GameLogic {
     private _rcNotEmpty(rc: RC): boolean {
         return !!this._rcBlock(rc);
     }
+    private _rcNotEmptyMerge(rc: RC): boolean {
+        return !!this._rcBlockMerge(rc);
+    }
 
     private _buideTraversals(dir: cc.Vec2): { cols: number[], rows: number[] } {
         let traversals = { cols: [], rows: [] };
@@ -469,6 +582,18 @@ export default class Game2048_GameLogic {
             traversals.cols.push(col);
         }
         for (let row = 0; row < this.colNum; row++) {
+            traversals.rows.push(row);
+        }
+        if (dir.x === 1) traversals.cols = traversals.cols.reverse();
+        if (dir.y === 1) traversals.rows = traversals.rows.reverse();
+        return traversals;
+    }
+    private _buideTraversalsMerge(dir: cc.Vec2): { cols: number[], rows: number[] } {
+        let traversals = { cols: [], rows: [] };
+        for (let col = 0; col < 4; col++) {
+            traversals.cols.push(col);
+        }
+        for (let row = 0; row < 2; row++) {
             traversals.rows.push(row);
         }
         if (dir.x === 1) traversals.cols = traversals.cols.reverse();
@@ -495,6 +620,12 @@ export default class Game2048_GameLogic {
         }
         return null;
     }
+    private _rcBlockMerge(rc: RC): LogicBlock {
+        if (this._withinBoundsMerge(rc)) {
+            return this.mergeMap[rc.row][rc.col];
+        }
+        return null;
+    }
 
     /**
      * 边界判断
@@ -504,6 +635,10 @@ export default class Game2048_GameLogic {
     private _withinBounds(rc: RC): boolean {
         return rc.col >= 0 && rc.col < this.colNum &&
             rc.row >= 0 && rc.row < this.colNum;
+    }
+    private _withinBoundsMerge(rc: RC): boolean {
+        return rc.col >= 0 && rc.col < 4 &&
+            rc.row >= 0 && rc.row < 2;
     }
 
 

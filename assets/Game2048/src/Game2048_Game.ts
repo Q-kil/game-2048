@@ -57,12 +57,21 @@ export default class Game2048_Game extends cc.Component {
         this.blockPool = new MyPool(this.blockPrefab);
         this.blockPool.create(9);
 
+        // this.inputHandler = new Game2048_InputHandler({
+        //     target: this.board,
+        //     onKeyUp: (dir: string) => {
+        //         if (!this.isMove) {
+        //             let obj = this.gameLogic.move(dir);
+        //             this.onMapChange(obj);
+        //         }
+        //     }
+        // })
         this.inputHandler = new Game2048_InputHandler({
-            target: this.board,
+            target: this.merge,
             onKeyUp: (dir: string) => {
                 if (!this.isMove) {
-                    let obj = this.gameLogic.move(dir);
-                    this.onMapChange(obj);
+                    let obj = this.gameLogic.moveMergeBox(dir);
+                    this.onMapChangeMerge(obj);
                 }
             }
         })
@@ -192,6 +201,11 @@ export default class Game2048_Game extends cc.Component {
             createMergeBlock.node.scale = 0;
             console.log('** createMergeBlock', mergeBlock);
             mergeBlock.target.onShow();
+
+            setTimeout(()=>{
+                let obj = this.gameLogic.moveMergeBox('LEFT');
+                this.onMapChangeMerge(obj);
+            }, 2000)
         }
     }
 
@@ -314,6 +328,71 @@ export default class Game2048_Game extends cc.Component {
             }
             for (let merge of mergeList) {
                 let com = this.createBlock(merge.number, merge.col, merge.row, this.blockLayer, false);
+                com.node.scale = 0;
+            }
+            // PPG2_SoundUtils.playSFX('move');
+
+            if (obj.hasMerge) {
+                // PPG2_SoundUtils.playSFX('merge');
+            }
+            let doAdd = () => {
+                for (let add of addList) {
+                    add.target.onShow();
+                }
+                for (let merge of mergeList) {
+                    merge.target.onMerge();
+                }
+
+                this.isMove = false;
+            }
+
+            if (moveList.length > 0) {
+                let removeList = [];
+                let completCount = 0;
+                for (let moveObj of moveList) {
+                    let block = moveObj.block
+                    let target: Game2048_Block = block.target;
+                    let pos = this.gameLogic.getBlockPosByRC(moveObj.to.col, moveObj.to.row);
+
+                    target.onMove(pos, () => {
+                        if (moveObj.needRemove) {
+                            removeList.push(target);
+                        }
+                        completCount++;
+                        if (completCount >= moveList.length) {
+                            for (let i = 0; i < removeList.length; i++) {
+                                this.blockPool.put(removeList[i].node);
+                            }
+
+                            doAdd();
+                        }
+                    })
+
+                }
+            } else {
+                doAdd();
+            }
+        }
+    }
+    onMapChangeMerge(obj) {
+        console.log('** obj merge', obj);
+        if (obj.isOver) {
+            this.showFail();
+            return;
+        }
+        if (obj.moved) {
+            this.checkMap();
+            this.isMove = true;
+
+            let moveList = obj.moveList;
+            let addList = obj.addList;
+            let mergeList = obj.mergeList;
+            for (let add of addList) {
+                let com = this.createMergeBlock(add.number, add.col, add.row, this.mergeLayer, false);
+                com.node.scale = 0;
+            }
+            for (let merge of mergeList) {
+                let com = this.createMergeBlock(merge.number, merge.col, merge.row, this.mergeLayer, false);
                 com.node.scale = 0;
             }
             // PPG2_SoundUtils.playSFX('move');
